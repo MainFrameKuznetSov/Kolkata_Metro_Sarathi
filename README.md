@@ -1,6 +1,6 @@
-# Kolkata Metro Guide
+# Kolkata Metro Sarathi
 
-Welcome to the **Kolkata Metro Guide** project! This repository provides a graphical guide and helpful resources for navigating the Kolkata Metro system, including route details, line connections, and visual representations of station locations and routes.
+Welcome to the **Kolkata Metro Sarathi** project! This repository provides a graphical guide and helpful resources for navigating the Kolkata Metro system, including route details, line connections, and visual representations of station locations and routes.
 
 ---
 
