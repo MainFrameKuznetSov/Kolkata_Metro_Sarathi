@@ -6,7 +6,7 @@ Welcome to the **Kolkata Metro Guide** project! This repository provides a graph
 
 ## Features
 
-- **Graphical Map**: A visual representation of the Kolkata Metro lines, including Green, Blue, Purple, Orange, and extended lines.
+- **Graphical Map**: A visual representation of the Kolkata Metro lines, including Green, Blue, Purple, Orange, Yellow(planned) and extended lines(upcoming).
 - **Station Details**: Important station information, including interchanges and line colors.
 - **Route Information**: Display connections between stations and suggest efficient paths for travelers.
 
