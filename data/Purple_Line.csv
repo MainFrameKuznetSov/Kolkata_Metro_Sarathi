@@ -1,0 +1,8 @@
+Station,Connected Stations
+Joka (36),Thakurpukur (37)
+Thakurpukur (37),"Joka (36), Sakherbazar (38)"
+Sakherbazar (38),"Thakurpukur (37), Behala Chowrasta (39)"
+Behala Chowrasta (39),"Sakherbazar (38), Behala Bazar (40)"
+Behala Bazar (40),"Behala Chowrasta (39), Taratala (41)"
+Taratala (41),"Behala Bazar (40), Majerhat (42)"
+Majerhat (42),Taratala (41)

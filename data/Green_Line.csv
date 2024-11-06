@@ -1,0 +1,13 @@
+Station,Connected Stations
+Howrah Maidan([0]),Howrah Railway Station (1)
+Howrah Railway Station([1]),"Howrah Maidan (0), Mahakaran (2)"
+Mahakaran([2]),"Howrah Railway Station (1), Esplanade (3)"
+Esplanade([3]),"Mahakaran (2), Sealdah (4)"
+Sealdah([4]),"Esplanade (3), Phoolbagan (5)"
+Phoolbagan([5]),"Sealdah (4), Salt Lake Stadium (6)"
+Salt Lake Stadium([6]),"Phoolbagan (5), Bengal Chemical (7)"
+Bengal Chemical([7]),"Salt Lake Stadium (6), City Centre I (8)"
+City Centre I([8]),"Bengal Chemical (7), Central Park (9)"
+Central Park([9]),"City Centre I (8), Korunamoyee (70)"
+Korunamoyee([70]),"Central Park (9), Salt Lake Sector V (10)"
+Salt Lake Sector V([10]),Korunamoyee (70)
