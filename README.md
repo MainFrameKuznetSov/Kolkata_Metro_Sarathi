@@ -39,6 +39,7 @@ Welcome to the **Kolkata Metro Sarathi** project! This repository provides a gra
 - **Python** — For data processing and visualization.
 - **NetworkX** — For building and visualizing the metro graph network.
 - **Matplotlib** — For plotting the graphical metro map.
+- **Pandas** - For easy facilitation of storing and re-writing data 
 - **Git** — For version control.
 
 ---
