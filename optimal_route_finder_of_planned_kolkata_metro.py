@@ -354,10 +354,11 @@
 import streamlit as st
 import networkx as nx
 import matplotlib.pyplot as plt
+import heapq
 
-st.set_page_config(page_title="Metro Route Planner", layout="wide")
-st.title("Metro Route Planner")
-st.write("Find the shortest metro route and view the full metro map.")
+st.set_page_config(page_title="Kolkata Metro Sarathi", layout="wide")
+st.title("Kolkata Metro Sarathi")
+st.write("Find the shortest metro route and view full metro map.")
 
 # Define metro lines
 green_line = [("HOWRAH MAIDAN", 0), ("HOWRAH STATION", 1), ("MAHAKARAN", 2),
@@ -397,6 +398,66 @@ orange_line_ext = [("HEMANTA MUKHERJEE", 47), ("VIP BAZAR", 54), ("RITWIK GHATAK
 
 color_priority = {"green": 7, "blue": 6, "purple": 5, "orange": 4,
                   "silver": 3, "yellow": 2, "gold": 1}
+
+
+def find_min_switch_path(G, station_lines, src, dest):
+    """
+    Returns (path_list, num_switches, num_stations) or (None, None, None) if no path.
+    """
+    # PQ entries are (switches, stations, current_station, current_line, parent)
+    pq = []
+    visited = {}  
+    # visited[(station, line)] = (best_switches, best_stations)
+
+    # Initialize one entry per line that src belongs to
+    for line in station_lines[src]:
+        entry = (0, 1, src, line, None)
+        heapq.heappush(pq, entry)
+        visited[(src, line)] = (0, 1)
+
+    best_final = None
+
+    while pq:
+        switches, stations_count, curr_station, curr_line, parent = heapq.heappop(pq)
+
+        # If we've already seen a strictly better cost for (curr_station, curr_line), skip
+        if visited.get((curr_station, curr_line), (float('inf'), float('inf'))) < (switches, stations_count):
+            continue
+
+        # Stop as soon as we pop a state at the destination
+        if curr_station == dest:
+            best_final = (switches, stations_count, curr_station, curr_line, parent)
+            break
+
+        # Explore each neighbor
+        for nbr in G.neighbors(curr_station):
+            edge_line = G[curr_station][nbr]['color']
+            new_switches = switches + (edge_line != curr_line)
+            new_stations = stations_count + 1
+
+            state_key = (nbr, edge_line)
+            best_seen = visited.get(state_key, (float('inf'), float('inf')))
+
+            if (new_switches, new_stations) < best_seen:
+                visited[state_key] = (new_switches, new_stations)
+                heapq.heappush(pq, (new_switches, new_stations, nbr, edge_line,
+                                     (switches, stations_count, curr_station, curr_line, parent)))
+
+    if best_final is None:
+        return None, None, None
+
+    # Reconstruct path
+    switches, stations_count, station, line, parent = best_final
+    rev_path = [station]
+    ptr = parent
+    while ptr is not None:
+        _, _, prev_station, _, prev_parent = ptr
+        rev_path.append(prev_station)
+        ptr = prev_parent
+
+    rev_path.reverse()
+    return rev_path, switches, stations_count
+
 
 # Build the full metro graph
 G = nx.Graph()
@@ -458,173 +519,168 @@ pos = {
 pos['HEMANTA MUKHERJEE'] = (21, 62)
 
 # Sidebar inputs for routing and map display
-src_input = st.sidebar.text_input("Enter the source station:", "HOWRAH MAIDAN")
-dest_input = st.sidebar.text_input("Enter the destination station:", "SALT LAKE SECTOR V")
+all_stations = list(G.nodes())
+all_stations.sort()
+src_input = st.sidebar.selectbox("Select the source station:", all_stations, index=all_stations.index("HOWRAH MAIDAN") if "HOWRAH MAIDAN" in all_stations else 0)
+dest_input = st.sidebar.selectbox("Select the destination station:", all_stations, index=all_stations.index("SALT LAKE SECTOR V") if "SALT LAKE SECTOR V" in all_stations else 0)
 
 # Button to find the route (subgraph)
 if st.sidebar.button("Find Route"):
     src = src_input.upper()
     dest = dest_input.upper()
 
-    # Check if the entered stations exist in the graph
+    # 1) Validate source/destination
     if src not in G.nodes():
         st.error(f"Source station '{src}' not found. Please check your input.")
-    elif dest not in G.nodes():
+        #return
+    if dest not in G.nodes():
         st.error(f"Destination station '{dest}' not found. Please check your input.")
+        #return
+
+    # 2) Build station_lines for every station in G
+    station_lines = {}
+    for station in G.nodes():
+        lines = set()
+        if station in {s[0] for s in green_line}:      
+            lines.add("green")
+        if station in {s[0] for s in blue_line}:       
+            lines.add("blue")
+        if station in {s[0] for s in purple_line}:     
+            lines.add("purple")
+        if station in {s[0] for s in orange_line}:     
+            lines.add("orange")
+        if station in {s[0] for s in purple_line_ext}: 
+            lines.add("silver")
+        if station in {s[0] for s in yellow_line}:     
+            lines.add("yellow")
+        if station in {s[0] for s in orange_line_ext}: 
+            lines.add("gold")
+        station_lines[station] = lines
+
+    # 3) Compute the minimum‐switch path instead of nx.shortest_path
+    path, min_switches, min_stations = find_min_switch_path(G, station_lines, src, dest)
+
+    if path is None:
+        st.error(f"No path exists between {src} and {dest}")
+        #return
+
+    # 4) Compute exactly where each switch occurs
+    edge_colors = [G[path[i]][path[i+1]]["color"] for i in range(len(path) - 1)]
+    transitions = []
+    prev_color = edge_colors[0]
+    for i in range(1, len(path) - 1):
+        curr_color = edge_colors[i]
+        if curr_color != prev_color:
+            transitions.append((path[i], prev_color, curr_color))
+            prev_color = curr_color
+
+    st.header("Track‐Switch Locations")
+    if transitions:
+        for station, from_line, to_line in transitions:
+            st.subheader(f"🔄 Change from {from_line.title()} to {to_line.title()} at {station}")
     else:
-        # Define sets for quick membership testing
-        n_green_line = {stn[0] for stn in green_line}
-        n_blue_line = {stn[0] for stn in blue_line}
-        n_purple_line = {stn[0] for stn in purple_line}
-        n_orange_line = {stn[0] for stn in orange_line}
-        n_purple_line_ext = {stn[0] for stn in purple_line_ext}
-        n_yellow_line = {stn[0] for stn in yellow_line}
-        n_orange_line_ext = {stn[0] for stn in orange_line_ext}
+        st.write("No transitions required.")
 
-        try:
-            path = nx.shortest_path(G, source=src, target=dest)
+    # 5) Show routing summary
+    st.header("Route Summary")
+    st.write(f"🔄 Minimum line‐switches: **{min_switches}**")
+    st.write(f"🚉 Stations traversed: **{min_stations}**")
+    st.write("Route: " + " → ".join(path))
 
-            # Build dictionary mapping station to available lines
-            station_lines = {}
-            for station in path:
-                lines = set()
-                if station in n_green_line: lines.add("Green Line")
-                if station in n_blue_line: lines.add("Blue Line")
-                if station in n_purple_line: lines.add("Purple Line")
-                if station in n_orange_line: lines.add("Orange Line")
-                if station in n_purple_line_ext: lines.add("Purple Line Extended")
-                if station in n_yellow_line: lines.add("Yellow Line")
-                if station in n_orange_line_ext: lines.add("Orange Line Extended")
-                station_lines[station] = lines
+    # ──────────────────────────────────────────────────────────────
+    # 6) Build subgraph nodes/edges and define subgraph_pos BEFORE any labeling loop
+    subgraph_nodes = set(path)
+    subgraph_edges = [
+        (u, v)
+        for u, v in G.edges()
+        if u in subgraph_nodes and v in subgraph_nodes
+    ]
+    subgraph = G.edge_subgraph(subgraph_edges)
+    subgraph_pos = {node: pos[node] for node in subgraph_nodes}
 
-            st.subheader("Dynamic Transitions (Lookahead):")
-            transitions = []
-            active_line = list(station_lines[path[0]])[0]
-            st.write(f"Initial active line: {active_line}")
+    # 7) Draw the subgraph
+    fig_sub, ax_sub = plt.subplots(figsize=(12, 8))
+    edge_colors = [subgraph[u][v]["color"] for u, v in subgraph.edges()]
+    nx.draw_networkx_nodes(subgraph, subgraph_pos, node_size=50, node_color="lightblue", ax=ax_sub)
+    nx.draw_networkx_edges(subgraph, subgraph_pos, edge_color=edge_colors, width=2, ax=ax_sub)
 
-            for i in range(1, len(path)):
-                current_station = path[i]
-                current_avail = station_lines[current_station]
-                if active_line in current_avail:
-                    j = i
-                    while j < len(path) and active_line in station_lines[path[j]]:
-                        j += 1
-                    if j < len(path):
-                        crit_avail = station_lines[path[j]]
-                        candidate = None
-                        for cand in current_avail:
-                            if cand != active_line and cand in crit_avail:
-                                candidate = cand
-                                break
-                        if candidate and candidate != active_line:
-                            transitions.append((path[i], active_line, candidate))
-                            active_line = candidate
-                else:
-                    candidate = list(current_avail)[0]
-                    transitions.append((path[i], active_line, candidate))
-                    active_line = candidate
-
-            if transitions:
-                for t in transitions:
-                    st.write(f"🔄 Change from {t[1]} to {t[2]} at {t[0]}")
+    # 8) Labeling loop: now it’s safe to reference subgraph_pos
+    cg = 1; cb = 0; cp = 1; cpe = 0; co = 1; cy = 0
+    done = set()
+    for node in path:
+        x, y = subgraph_pos[node]     # <— subgraph_pos is already defined
+        if node in done:
+            continue
+        if node == "KAVI SUBHAS":
+            ax_sub.text(x, y+2, node, fontsize=6, ha='left', va='top')
+            done.add(node)
+            continue
+        if node == "ESPLANADE":
+            cg += 1
+            ax_sub.text(x+0.1, y+0.5, node, fontsize=6, ha='left', va='bottom')
+            done.add(node)
+            continue
+        if node == "PARK STREET":
+            cb += 1
+            ax_sub.text(x-0.3, y, node, fontsize=6, ha='right', va='center')
+            done.add(node)
+            continue
+        if node == "NOAPARA":
+            cy += 1
+            ax_sub.text(x+0.1, y-1, node, fontsize=6, ha='left', va='top')
+            done.add(node)
+            continue
+        if node == "HEMANTA MUKHERJEE":
+            co += 1
+            ax_sub.text(x+0.5, y-1, node, fontsize=6, ha='left', va='bottom')
+            done.add(node)
+            continue
+        if node in [n[0] for n in green_line]:
+            cg += 1
+            if cg & 1:
+                ax_sub.text(x+0.1, y+0.7, node, fontsize=6, ha='left', va='bottom')
             else:
-                st.write("No transitions required.")
+                ax_sub.text(x+0.1, y-0.7, node, fontsize=6, ha='left', va='top')
+        elif node in [n[0] for n in blue_line]:
+            cb += 1
+            if cb & 1:
+                ax_sub.text(x+0.3, y, node, fontsize=6, ha='left', va='center')
+            else:
+                ax_sub.text(x-0.3, y, node, fontsize=6, ha='right', va='center')
+        elif node in [n[0] for n in purple_line]:
+            cp += 1
+            if cp & 1:
+                ax_sub.text(x+0.3, y+1.5, node, fontsize=6, ha='left', va='center')
+            else:
+                ax_sub.text(x-0.3, y-1.5, node, fontsize=6, ha='left', va='center')
+        elif node in [n[0] for n in orange_line]:
+            co += 1
+            if co & 1:
+                ax_sub.text(x-0.3, y+1, node, fontsize=6, ha='left', va='bottom')
+            else:
+                ax_sub.text(x-0.3, y-1, node, fontsize=6, ha='left', va='top')
+        elif node in [n[0] for n in purple_line_ext]:
+            cpe += 1
+            if cpe & 1:
+                ax_sub.text(x-0.3, y+1, node, fontsize=6, ha='left', va='bottom')
+            else:
+                ax_sub.text(x-0.3, y-1, node, fontsize=6, ha='left', va='top')
+        elif node in [n[0] for n in yellow_line]:
+            cy += 1
+            if cy & 1:
+                ax_sub.text(x-0.3, y+1, node, fontsize=6, ha='left', va='bottom')
+            else:
+                ax_sub.text(x-0.3, y-1, node, fontsize=6, ha='left', va='top')
+        elif node in [n[0] for n in orange_line_ext]:
+            ax_sub.text(x, y+0.3, node, fontsize=6, ha='left', va='bottom')
+        done.add(node)
 
-            st.write(f"Final Active Line: {active_line}")
-            st.write("Shortest Path: " + " -> ".join(path))
+    ax_sub.axis("off")
+    ax_sub.set_xlim(-10, 53)
+    ax_sub.set_ylim(-41, 66)
+    st.subheader("Shortest Path")
+    st.pyplot(fig_sub)
 
-        except nx.NetworkXNoPath:
-            st.error(f"No path exists between {src} and {dest}")
-            path = None
-
-        # If a valid path was found, plot the subgraph
-        if path:
-            subgraph_nodes = set(path)
-            subgraph_edges = [(u, v) for u, v in G.edges() if u in subgraph_nodes and v in subgraph_nodes]
-            subgraph = G.edge_subgraph(subgraph_edges)
-            subgraph_pos = {node: pos[node] for node in subgraph_nodes}
-
-            fig_sub, ax_sub = plt.subplots(figsize=(12, 8))
-            edge_colors = [subgraph[u][v]['color'] for u, v in subgraph.edges()]
-            nx.draw_networkx_nodes(subgraph, subgraph_pos, node_size=50, node_color="lightblue", ax=ax_sub)
-            nx.draw_networkx_edges(subgraph, subgraph_pos, edge_color=edge_colors, width=2, ax=ax_sub)
-
-            # Conditional labeling for the subgraph
-            cg = 1; cb = 0; cp = 1; cpe = 0; co = 1; cy = 0
-            done = set()
-            for node in path:
-                x, y = subgraph_pos[node]
-                if node in done:
-                    continue
-                if node == "KAVI SUBHAS":
-                    ax_sub.text(x, y+2, node, fontsize=6, ha='left', va='top')
-                    done.add(node)
-                    continue
-                if node == "ESPLANADE":
-                    cg += 1
-                    ax_sub.text(x+0.1, y+0.5, node, fontsize=6, ha='left', va='bottom')
-                    done.add(node)
-                    continue
-                if node == "PARK STREET":
-                    cb += 1
-                    ax_sub.text(x-0.3, y, node, fontsize=6, ha='right', va='center')
-                    done.add(node)
-                    continue
-                if node == "NOAPARA":
-                    cy += 1
-                    ax_sub.text(x+0.1, y-1, node, fontsize=6, ha='left', va='top')
-                    done.add(node)
-                    continue
-                if node == "HEMANTA MUKHERJEE":
-                    co += 1
-                    ax_sub.text(x+0.5, y-1, node, fontsize=6, ha='left', va='bottom')
-                    done.add(node)
-                    continue
-                if node in [n[0] for n in green_line]:
-                    cg += 1
-                    if cg & 1:
-                        ax_sub.text(x+0.1, y+0.7, node, fontsize=6, ha='left', va='bottom')
-                    else:
-                        ax_sub.text(x+0.1, y-0.7, node, fontsize=6, ha='left', va='top')
-                elif node in [n[0] for n in blue_line]:
-                    cb += 1
-                    if cb & 1:
-                        ax_sub.text(x+0.3, y, node, fontsize=6, ha='left', va='center')
-                    else:
-                        ax_sub.text(x-0.3, y, node, fontsize=6, ha='right', va='center')
-                elif node in [n[0] for n in purple_line]:
-                    cp += 1
-                    if cp & 1:
-                        ax_sub.text(x+0.3, y+1.5, node, fontsize=6, ha='left', va='center')
-                    else:
-                        ax_sub.text(x-0.3, y-1.5, node, fontsize=6, ha='left', va='center')
-                elif node in [n[0] for n in orange_line]:
-                    co += 1
-                    if co & 1:
-                        ax_sub.text(x-0.3, y+1, node, fontsize=6, ha='left', va='bottom')
-                    else:
-                        ax_sub.text(x-0.3, y-1, node, fontsize=6, ha='left', va='top')
-                elif node in [n[0] for n in purple_line_ext]:
-                    cpe += 1
-                    if cpe & 1:
-                        ax_sub.text(x-0.3, y+1, node, fontsize=6, ha='left', va='bottom')
-                    else:
-                        ax_sub.text(x-0.3, y-1, node, fontsize=6, ha='left', va='top')
-                elif node in [n[0] for n in yellow_line]:
-                    cy += 1
-                    if cy & 1:
-                        ax_sub.text(x-0.3, y+1, node, fontsize=6, ha='left', va='bottom')
-                    else:
-                        ax_sub.text(x-0.3, y-1, node, fontsize=6, ha='left', va='top')
-                elif node in [n[0] for n in orange_line_ext]:
-                    ax_sub.text(x, y+0.3, node, fontsize=6, ha='left', va='bottom')
-                done.add(node)
-
-            ax_sub.axis('off')
-            ax_sub.set_xlim(-10, 53)
-            ax_sub.set_ylim(-41, 66)
-            st.subheader("Shortest Path Subgraph")
-            st.pyplot(fig_sub)
 
 # Button to display the full metro map (placed outside the "Find Route" block)
 if st.sidebar.button("Show Full Map"):
