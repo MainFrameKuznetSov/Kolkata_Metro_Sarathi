@@ -12,19 +12,6 @@ Welcome to the **Kolkata Metro Sarathi** project! This repository provides a gra
 
 ---
 
-## Table of Contents
-
-- [Features](#features)
-- [Project Structure](#project-structure)
-- [Technologies Used](#technologies-used)
-- [Setup](#setup)
-- [Usage](#usage)
-- [Future Enhancements](#future-enhancements)
-- [Contributing](#contributing)
-- [License](#license)
-
----
-
 ## Project Structure
 
 - `src/` — Contains the main code for the metro guide.
