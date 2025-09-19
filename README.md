@@ -50,10 +50,15 @@ Welcome to the **Kolkata Metro Sarathi** project! This repository provides a gra
    ```bash
    git clone https://github.com/your-username/kolkata-metro-guide.git
    cd kolkata-metro-guide
-2. **Install required libraries**:
+2. **Create a virtual environment**
+   ```bash
+   python -m venv venv
+   venv/Scripts/Activate
+   ```
+4. **Install required libraries**:
    ```bash
    pip install -r requirements.txt
-3. **Run the script**
+5. **Run the script**
    ```bash
    python main.py
 
@@ -66,7 +71,6 @@ Welcome to the **Kolkata Metro Sarathi** project! This repository provides a gra
    - Users can plan routes by observing line changes and following station-to-station paths.
   
 ## Future Plans
-  - Shortest Path Finder: Add a route-finding algorithm to suggest the shortest or most efficient path using Dijkstra's Algorithm.
   - Real-time Data: Integrate real-time metro timings and alerts.
 
 ## Contibutions
